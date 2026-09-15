@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createOpenAI } from "@ai-sdk/openai"
 import path from "path"
 
 // Bun applies a patch only to the exact `name@version` named in
@@ -26,4 +27,50 @@ describe("patched dependencies", () => {
       }
     })
   }
+
+  test.each([
+    {
+      api: "chat",
+      tier: "fast",
+      response: {
+        id: "chat-1",
+        created: 0,
+        model: "custom-model",
+        object: "chat.completion",
+        choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      },
+    },
+    {
+      api: "responses",
+      tier: "flex",
+      response: {
+        id: "response-1",
+        created_at: 0,
+        model: "custom-model",
+        object: "response",
+        output: [],
+        usage: { input_tokens: 1, output_tokens: 0 },
+        status: "completed",
+      },
+    },
+  ] as const)("OpenAI $api preserves $tier service tier for custom models", async ({ api, tier, response }) => {
+    let body: Record<string, unknown> | undefined
+    const mockFetch = Object.assign(
+      async (_input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        body = JSON.parse(String(init?.body))
+        return Response.json(response)
+      },
+      { preconnect: fetch.preconnect },
+    )
+    const openai = createOpenAI({ apiKey: "test", fetch: mockFetch })
+    const model = api === "chat" ? openai.chat("custom-model") : openai.responses("custom-model")
+
+    await model.doGenerate({
+      prompt: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
+      providerOptions: { openai: { serviceTier: tier } },
+    })
+
+    expect(body?.service_tier).toBe(tier)
+  })
 })

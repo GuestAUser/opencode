@@ -64,7 +64,7 @@
       "drizzle-kit": "1.0.0-rc.2",
       "drizzle-orm": "1.0.0-rc.2",
       "effect": "4.0.0-beta.83",
-      "ai": "6.0.168",
+      "ai": "6.0.282",
       "cross-spawn": "7.0.6",
       "hono": "4.10.7",
       "hono-openapi": "1.1.2",
@@ -163,6 +163,6 @@
     "@ai-sdk/groq@3.0.31": "patches/@ai-sdk%2Fgroq@3.0.31.patch",
     "@ai-sdk/anthropic@3.0.111": "patches/@ai-sdk%2Fanthropic@3.0.111.patch",
     "@ai-sdk/amazon-bedrock@4.0.166": "patches/@ai-sdk%2Famazon-bedrock@4.0.166.patch",
-    "@ai-sdk/openai@3.0.88": "patches/@ai-sdk%2Fopenai@3.0.88.patch"
+    "@ai-sdk/openai@3.0.112": "patches/@ai-sdk%2Fopenai@3.0.112.patch"
   }
 }

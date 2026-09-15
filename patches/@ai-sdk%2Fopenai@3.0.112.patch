@@ -1,8 +1,8 @@
 diff --git a/dist/index.js b/dist/index.js
-index 5fc82d7ca0f5fba1da3b24c15bb714f51b5aa178..e1a3e2c97774af3a5688c7052bd9a07d692fcc8f 100644
+index fd1d715af0d3b8354b56c36c6f677fd6faa3d8f8..e26bf55e7478a8719cfb54ecb95d615aa9e83ba7 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -1035,22 +1035,6 @@ var OpenAIChatLanguageModel = class {
+@@ -1085,22 +1085,6 @@ var OpenAIChatLanguageModel = class {
          });
        }
      }
@@ -14,7 +14,7 @@ index 5fc82d7ca0f5fba1da3b24c15bb714f51b5aa178..e1a3e2c97774af3a5688c7052bd9a07d
 -      });
 -      baseArgs.service_tier = void 0;
 -    }
--    if (openaiOptions.serviceTier === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if ((openaiOptions.serviceTier === "priority" || openaiOptions.serviceTier === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -25,7 +25,7 @@ index 5fc82d7ca0f5fba1da3b24c15bb714f51b5aa178..e1a3e2c97774af3a5688c7052bd9a07d
      const {
        tools: openaiTools2,
        toolChoice: openaiToolChoice,
-@@ -5454,22 +5438,6 @@ var OpenAIResponsesLanguageModel = class {
+@@ -6082,22 +6066,6 @@ var OpenAIResponsesLanguageModel = class {
          });
        }
      }
@@ -37,7 +37,7 @@ index 5fc82d7ca0f5fba1da3b24c15bb714f51b5aa178..e1a3e2c97774af3a5688c7052bd9a07d
 -      });
 -      delete baseArgs.service_tier;
 -    }
--    if ((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if (((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" || (openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -45,14 +45,14 @@ index 5fc82d7ca0f5fba1da3b24c15bb714f51b5aa178..e1a3e2c97774af3a5688c7052bd9a07d
 -      });
 -      delete baseArgs.service_tier;
 -    }
-     const shellToolEnvType = (_k = (_j = (_i = tools == null ? void 0 : tools.find(
+     const shellToolEnvType = (_m = (_l = (_k = tools == null ? void 0 : tools.find(
        (tool) => tool.type === "provider" && tool.id === "openai.shell"
-     )) == null ? void 0 : _i.args) == null ? void 0 : _j.environment) == null ? void 0 : _k.type;
+     )) == null ? void 0 : _k.args) == null ? void 0 : _l.environment) == null ? void 0 : _m.type;
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 589c4f76955bee692b8af36ea1d9a15121695d4a..6838ea0a362c8fe774527bb1126b8031ebfd3fab 100644
+index bf0dfd74b494fbce8de6b001abc901a3ef15d6e4..46b8dabd41ddea7a95776edc1482397a43dde22d 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -1031,22 +1031,6 @@ var OpenAIChatLanguageModel = class {
+@@ -1081,22 +1081,6 @@ var OpenAIChatLanguageModel = class {
          });
        }
      }
@@ -64,7 +64,7 @@ index 589c4f76955bee692b8af36ea1d9a15121695d4a..6838ea0a362c8fe774527bb1126b8031
 -      });
 -      baseArgs.service_tier = void 0;
 -    }
--    if (openaiOptions.serviceTier === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if ((openaiOptions.serviceTier === "priority" || openaiOptions.serviceTier === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -75,7 +75,7 @@ index 589c4f76955bee692b8af36ea1d9a15121695d4a..6838ea0a362c8fe774527bb1126b8031
      const {
        tools: openaiTools2,
        toolChoice: openaiToolChoice,
-@@ -5557,22 +5541,6 @@ var OpenAIResponsesLanguageModel = class {
+@@ -6188,22 +6172,6 @@ var OpenAIResponsesLanguageModel = class {
          });
        }
      }
@@ -87,7 +87,7 @@ index 589c4f76955bee692b8af36ea1d9a15121695d4a..6838ea0a362c8fe774527bb1126b8031
 -      });
 -      delete baseArgs.service_tier;
 -    }
--    if ((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if (((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" || (openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -95,14 +95,14 @@ index 589c4f76955bee692b8af36ea1d9a15121695d4a..6838ea0a362c8fe774527bb1126b8031
 -      });
 -      delete baseArgs.service_tier;
 -    }
-     const shellToolEnvType = (_k = (_j = (_i = tools == null ? void 0 : tools.find(
+     const shellToolEnvType = (_m = (_l = (_k = tools == null ? void 0 : tools.find(
        (tool) => tool.type === "provider" && tool.id === "openai.shell"
-     )) == null ? void 0 : _i.args) == null ? void 0 : _j.environment) == null ? void 0 : _k.type;
+     )) == null ? void 0 : _k.args) == null ? void 0 : _l.environment) == null ? void 0 : _m.type;
 diff --git a/dist/internal/index.js b/dist/internal/index.js
-index ad78b5df9359509091f4b8a1751dc34c03c74e32..ed92f56d8fe9c1442f741ef8d42d592ce9b28643 100644
+index c2faa4d32b6a5731d9bfc46877093e26cf8c8140..35ae63576246fabe9730822e3877a33ad90e29f0 100644
 --- a/dist/internal/index.js
 +++ b/dist/internal/index.js
-@@ -1070,22 +1070,6 @@ var OpenAIChatLanguageModel = class {
+@@ -1120,22 +1120,6 @@ var OpenAIChatLanguageModel = class {
          });
        }
      }
@@ -114,7 +114,7 @@ index ad78b5df9359509091f4b8a1751dc34c03c74e32..ed92f56d8fe9c1442f741ef8d42d592c
 -      });
 -      baseArgs.service_tier = void 0;
 -    }
--    if (openaiOptions.serviceTier === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if ((openaiOptions.serviceTier === "priority" || openaiOptions.serviceTier === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -125,7 +125,7 @@ index ad78b5df9359509091f4b8a1751dc34c03c74e32..ed92f56d8fe9c1442f741ef8d42d592c
      const {
        tools: openaiTools,
        toolChoice: openaiToolChoice,
-@@ -5724,22 +5708,6 @@ var OpenAIResponsesLanguageModel = class {
+@@ -6349,22 +6333,6 @@ var OpenAIResponsesLanguageModel = class {
          });
        }
      }
@@ -137,7 +137,7 @@ index ad78b5df9359509091f4b8a1751dc34c03c74e32..ed92f56d8fe9c1442f741ef8d42d592c
 -      });
 -      delete baseArgs.service_tier;
 -    }
--    if ((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if (((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" || (openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -145,14 +145,14 @@ index ad78b5df9359509091f4b8a1751dc34c03c74e32..ed92f56d8fe9c1442f741ef8d42d592c
 -      });
 -      delete baseArgs.service_tier;
 -    }
-     const shellToolEnvType = (_k = (_j = (_i = tools == null ? void 0 : tools.find(
+     const shellToolEnvType = (_m = (_l = (_k = tools == null ? void 0 : tools.find(
        (tool) => tool.type === "provider" && tool.id === "openai.shell"
-     )) == null ? void 0 : _i.args) == null ? void 0 : _j.environment) == null ? void 0 : _k.type;
+     )) == null ? void 0 : _k.args) == null ? void 0 : _l.environment) == null ? void 0 : _m.type;
 diff --git a/dist/internal/index.mjs b/dist/internal/index.mjs
-index db7d6741c9ea615d577ea07722b469c144066268..f6b41b2832d2c8392072e0ecc1612e9e18b1b48e 100644
+index 785d7688f7ab3ea5eb7b19ef77f77f71b349f3cd..015b03b7f14f8d3884e94f4d34249b2d7a392cde 100644
 --- a/dist/internal/index.mjs
 +++ b/dist/internal/index.mjs
-@@ -1023,22 +1023,6 @@ var OpenAIChatLanguageModel = class {
+@@ -1073,22 +1073,6 @@ var OpenAIChatLanguageModel = class {
          });
        }
      }
@@ -164,7 +164,7 @@ index db7d6741c9ea615d577ea07722b469c144066268..f6b41b2832d2c8392072e0ecc1612e9e
 -      });
 -      baseArgs.service_tier = void 0;
 -    }
--    if (openaiOptions.serviceTier === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if ((openaiOptions.serviceTier === "priority" || openaiOptions.serviceTier === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -175,7 +175,7 @@ index db7d6741c9ea615d577ea07722b469c144066268..f6b41b2832d2c8392072e0ecc1612e9e
      const {
        tools: openaiTools,
        toolChoice: openaiToolChoice,
-@@ -5802,22 +5786,6 @@ var OpenAIResponsesLanguageModel = class {
+@@ -6430,22 +6414,6 @@ var OpenAIResponsesLanguageModel = class {
          });
        }
      }
@@ -187,7 +187,7 @@ index db7d6741c9ea615d577ea07722b469c144066268..f6b41b2832d2c8392072e0ecc1612e9e
 -      });
 -      delete baseArgs.service_tier;
 -    }
--    if ((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" && !modelCapabilities.supportsPriorityProcessing) {
+-    if (((openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "priority" || (openaiOptions == null ? void 0 : openaiOptions.serviceTier) === "fast") && !modelCapabilities.supportsPriorityProcessing) {
 -      warnings.push({
 -        type: "unsupported",
 -        feature: "serviceTier",
@@ -195,14 +195,14 @@ index db7d6741c9ea615d577ea07722b469c144066268..f6b41b2832d2c8392072e0ecc1612e9e
 -      });
 -      delete baseArgs.service_tier;
 -    }
-     const shellToolEnvType = (_k = (_j = (_i = tools == null ? void 0 : tools.find(
+     const shellToolEnvType = (_m = (_l = (_k = tools == null ? void 0 : tools.find(
        (tool) => tool.type === "provider" && tool.id === "openai.shell"
-     )) == null ? void 0 : _i.args) == null ? void 0 : _j.environment) == null ? void 0 : _k.type;
+     )) == null ? void 0 : _k.args) == null ? void 0 : _l.environment) == null ? void 0 : _m.type;
 diff --git a/src/chat/openai-chat-language-model.ts b/src/chat/openai-chat-language-model.ts
-index 009a58deea236c2be03adc5cd03f98ed9050fd7b..a606675d82fc72a0bab8d52ac99866100e7ffb1d 100644
+index 32fa12b0099149bdd802255e2f1a28c4c2d9d1d9..758dd9e317cb9f5d608b5585411ba37f50266e37 100644
 --- a/src/chat/openai-chat-language-model.ts
 +++ b/src/chat/openai-chat-language-model.ts
-@@ -267,34 +267,6 @@ export class OpenAIChatLanguageModel implements LanguageModelV3 {
+@@ -297,35 +297,6 @@ export class OpenAIChatLanguageModel implements LanguageModelV3 {
        }
      }
  
@@ -222,7 +222,8 @@ index 009a58deea236c2be03adc5cd03f98ed9050fd7b..a606675d82fc72a0bab8d52ac9986610
 -
 -    // Validate priority processing support
 -    if (
--      openaiOptions.serviceTier === 'priority' &&
+-      (openaiOptions.serviceTier === 'priority' ||
+-        openaiOptions.serviceTier === 'fast') &&
 -      !modelCapabilities.supportsPriorityProcessing
 -    ) {
 -      warnings.push({
@@ -238,10 +239,10 @@ index 009a58deea236c2be03adc5cd03f98ed9050fd7b..a606675d82fc72a0bab8d52ac9986610
        tools: openaiTools,
        toolChoice: openaiToolChoice,
 diff --git a/src/responses/openai-responses-language-model.ts b/src/responses/openai-responses-language-model.ts
-index 926e7ec713480353b969901f19c5d1d8cc883dab..ed457ce8f07a60ed48c47a3cbf11b2a7c6cf6415 100644
+index 1001f5ffec51ef4dbcbc38acdd14e682c7753ed4..cef0f67c9c00458c4287302e2637f288d856446c 100644
 --- a/src/responses/openai-responses-language-model.ts
 +++ b/src/responses/openai-responses-language-model.ts
-@@ -433,36 +433,6 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
+@@ -520,37 +520,6 @@ export class OpenAIResponsesLanguageModel implements LanguageModelV3 {
        }
      }
  
@@ -262,7 +263,8 @@ index 926e7ec713480353b969901f19c5d1d8cc883dab..ed457ce8f07a60ed48c47a3cbf11b2a7
 -
 -    // Validate priority processing support
 -    if (
--      openaiOptions?.serviceTier === 'priority' &&
+-      (openaiOptions?.serviceTier === 'priority' ||
+-        openaiOptions?.serviceTier === 'fast') &&
 -      !modelCapabilities.supportsPriorityProcessing
 -    ) {
 -      warnings.push({

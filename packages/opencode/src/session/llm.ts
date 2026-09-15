@@ -321,6 +321,8 @@ const live: Layer.Layer<
           abortSignal: input.abort,
           headers: prepared.headers,
           maxRetries: input.retries ?? 0,
+          // Request preparation injects OpenCode-owned system prompts into messages.
+          allowSystemInMessages: true,
           messages: prepared.messages,
           model: wrapLanguageModel({
             model: language,
