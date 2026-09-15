@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 import { tmpdir } from "../../../fixture/fixture"
 import { mount, wait } from "./sync-fixture"
 import type { GlobalEvent } from "@opencode-ai/sdk/v2"
@@ -18,6 +18,56 @@ function branchEvent(branch: string, workspace?: string): GlobalEvent {
 }
 
 describe("tui sync", () => {
+  test.each(
+    ["/config", "/session", "/mcp", "/config,/session", "lsp.updated"].flatMap((endpoint) =>
+      (["shutdown", "network", "unrelated abort"] as const).map((failure) => ({ endpoint, failure })),
+    ),
+  )("handles $failure while reading $endpoint on exit", async ({ endpoint, failure }) => {
+    await using tmp = await tmpdir()
+    await Bun.write(`${tmp.path}/kv.json`, "{}")
+    let pending = false
+    let started = 0
+    const endpoints = (endpoint === "lsp.updated" ? "/lsp" : endpoint).split(",")
+    const error = failure === "network" ? new Error("Network failure") : new DOMException("Other abort", "AbortError")
+    const errors = spyOn(console, "error").mockImplementation(() => {})
+    const { app, sync, emit } = await mount((url, request) => {
+      if (!pending || !endpoints.includes(url.pathname)) return
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            started++
+            request.signal.addEventListener(
+              "abort",
+              () => controller.error(failure === "shutdown" ? request.signal.reason : error),
+              { once: true },
+            )
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      )
+    }, tmp.path)
+    try {
+      pending = true
+      const bootstrap = endpoint === "lsp.updated"
+        ? Promise.resolve(emit({ directory: "/tmp/other", payload: { id: "evt_lsp_exit", type: "lsp.updated", properties: {} } }))
+        : sync.bootstrap({ fatal: false }).then(() => undefined, (error: unknown) => error)
+      await wait(() => started === endpoints.length)
+      app.renderer.destroy()
+      expect(await bootstrap).toBe(failure === "shutdown" || endpoint === "lsp.updated" ? undefined : error)
+      await Bun.sleep(20)
+      expect(errors.mock.calls).toEqual(
+        failure === "shutdown"
+          ? []
+          : endpoint === "lsp.updated"
+            ? [["Failed to refresh LSP status", error]]
+            : [["tui bootstrap failed", { error: error.message, name: error.name, stack: error.stack }]],
+      )
+    } finally {
+      app.renderer.destroy()
+      errors.mockRestore()
+    }
+  })
+
   test("refresh scopes sessions by default and lists project sessions when disabled", async () => {
     await using tmp = await tmpdir()
     await Bun.write(`${tmp.path}/kv.json`, "{}")

@@ -432,7 +432,13 @@ export const {
 
         case "lsp.updated": {
           const workspace = project.workspace.current()
-          void sdk.client.lsp.status({ workspace }).then((x) => setStore("lsp", x.data ?? []))
+          void sdk.client.lsp
+            .status({ workspace })
+            .then((x) => setStore("lsp", x.data ?? []))
+            .catch((error) => {
+              if (sdk.signal.aborted && error === sdk.signal.reason) return
+              console.error("Failed to refresh LSP status", error)
+            })
           break
         }
 
@@ -453,6 +459,8 @@ export const {
       const workspace = project.workspace.current()
       const projectPromise = project.sync()
       const sessionListPromise = projectPromise.then(() => listSessions())
+      // Observe early rejection until the blocking or background group adopts it below.
+      void sessionListPromise.catch(() => {})
 
       // blocking - include session.list when continuing a session
       const providersPromise = sdk.client.config.providers({ workspace }, { throwOnError: true })
@@ -517,7 +525,7 @@ export const {
         .then(() => {
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
-          void Promise.all([
+          return Promise.all([
             ...(args.continue ? [] : [sessionListPromise.then((sessions) => setStore("session", reconcile(sessions)))]),
             consoleStatePromise.then((consoleState) => setStore("console_state", reconcile(consoleState))),
             sdk.client.command.list({ workspace }).then((x) => setStore("command", reconcile(x.data ?? []))),
@@ -538,6 +546,7 @@ export const {
           })
         })
         .catch(async (e) => {
+          if (sdk.signal.aborted && e === sdk.signal.reason) return
           console.error("tui bootstrap failed", {
             error: e instanceof Error ? e.message : String(e),
             name: e instanceof Error ? e.name : undefined,
