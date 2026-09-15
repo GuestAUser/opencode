@@ -139,6 +139,7 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
     })
 
     return {
+      signal: abort.signal,
       get client() {
         return sdk
       },

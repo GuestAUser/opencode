@@ -121,10 +121,20 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       },
     }
 
+    function refresh(requests: Promise<unknown>[]) {
+      void Promise.allSettled(requests).then((settled) => {
+        for (const failure of settled) {
+          if (failure.status !== "rejected") continue
+          if (sdk.signal.aborted && failure.reason === sdk.signal.reason) continue
+          console.error("Failed to refresh location data", failure.reason)
+        }
+      })
+    }
+
     function handleEvent(event: V2Event) {
       switch (event.type) {
         case "catalog.updated":
-          void Promise.all([
+          refresh([
             result.location.model.refresh(event.location),
             result.location.provider.refresh(event.location),
           ])
@@ -390,10 +400,10 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
           })
           break
         case "reference.updated":
-          void result.location.reference.refresh()
+          refresh([result.location.reference.refresh()])
           break
         case "integration.updated":
-          void Promise.all([
+          refresh([
             result.location.integration.refresh(event.location),
             result.location.model.refresh(event.location),
             result.location.provider.refresh(event.location),
@@ -549,7 +559,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     }
 
     onMount(() => {
-      void Promise.allSettled([
+      refresh([
         result.location.refresh(),
         result.location.agent.refresh(),
         result.location.integration.refresh(),
@@ -558,10 +568,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
         result.location.reference.refresh(),
         result.location.command.refresh(),
         result.location.skill.refresh(),
-      ]).then((settled) => {
-        for (const failure of settled.filter((item) => item.status === "rejected"))
-          console.error("Failed to refresh default location data", failure.reason)
-      })
+      ])
     })
 
     return result

@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { testRender } from "@opentui/solid"
 import type { Event, GlobalEvent } from "@opencode-ai/sdk/v2"
 import { onMount } from "solid-js"
@@ -24,6 +24,73 @@ function global(payload: Event): GlobalEvent {
 function emitEvent(events: ReturnType<typeof createEventSource>, payload: Event) {
   events.emit(global(payload))
 }
+
+test.each(
+  (["startup", "catalog.updated", "integration.updated", "reference.updated"] as const).flatMap((event) =>
+    (["shutdown", "network", "unrelated abort"] as const).map((failure) => ({ event, failure })),
+  ),
+)(
+  "handles $event refresh $failure on exit",
+  async ({ event, failure }) => {
+    const events = createEventSource()
+    const calls = createFetch(undefined, events)
+    const errors = spyOn(console, "error").mockImplementation(() => {})
+    const error = failure === "network" ? new Error("Network failure") : new DOMException("Other abort", "AbortError")
+    let pending = event === "startup"
+    let signal: AbortSignal | undefined
+    let ready = false
+    const fetcher = Object.assign(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init)
+        const target = event === "reference.updated" ? "/api/reference" : "/api/model"
+        if (pending && new URL(request.url).pathname === target) {
+          signal = request.signal
+          return new Promise<Response>((_, reject) => {
+            request.signal.addEventListener(
+              "abort",
+              () => reject(failure === "shutdown" ? request.signal.reason : error),
+              { once: true },
+            )
+          })
+        }
+        return calls.fetch(input, init)
+      },
+      { preconnect: fetch.preconnect },
+    )
+    function Probe() {
+      const data = useData()
+      onMount(async () => {
+        if (event !== "startup") await wait(() => data.location.model.list() !== undefined)
+        ready = true
+      })
+      return <box />
+    }
+    const app = await testRender(() => (
+      <TestTuiContexts>
+        <SDKProvider url="http://test" directory={directory} events={events.source} fetch={fetcher}>
+          <ProjectProvider>
+            <DataProvider>
+              <Probe />
+            </DataProvider>
+          </ProjectProvider>
+        </SDKProvider>
+      </TestTuiContexts>
+    ))
+    try {
+      await wait(() => ready)
+      pending = true
+      if (event !== "startup") emitEvent(events, { id: "evt_exit", type: event, properties: {} })
+      await wait(() => signal !== undefined)
+      app.renderer.destroy()
+      await Bun.sleep(20)
+      expect(signal?.aborted).toBe(true)
+      expect(errors.mock.calls).toEqual(failure === "shutdown" ? [] : [["Failed to refresh location data", error]])
+    } finally {
+      app.renderer.destroy()
+      errors.mockRestore()
+    }
+  },
+)
 
 test("refreshes resources into reactive getters", async () => {
   const events = createEventSource()
