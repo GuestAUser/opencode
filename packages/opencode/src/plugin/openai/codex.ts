@@ -297,7 +297,8 @@ function cyberRequestBody(body: RequestInit["body"], selection: string, access: 
       (top !== undefined && nested !== undefined && (typeof top !== "string" || typeof nested !== "string" || top.toLowerCase() !== nested.toLowerCase())) ||
       createHash("sha256").update(email.toLowerCase()).digest("hex") !== identity
     ) throw new Error("Codex cyber account changed or is unavailable; check /account and restart")
-    if (request.model !== "gpt-5.6-sol") throw new Error("Daybreak Blue mode currently requires GPT-5.6 Sol")
+    if (request.model !== "gpt-5.6-sol" && request.model !== "gpt-5.6-terra" && request.model !== "gpt-5.6-luna")
+      throw new Error("Blue cyber mode requires GPT-5.6 Sol, Terra or Luna; Astra and Red-only cyber models are excluded")
   }
   const programs = request.access_programs
   if (programs !== undefined && (!programs || typeof programs !== "object" || Array.isArray(programs)))

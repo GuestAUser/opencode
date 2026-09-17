@@ -20,7 +20,11 @@ function createTestJwt(payload: object): string {
 }
 
 describe("plugin.codex", () => {
-  test.each([false, true])("forwards cyber selection and binds Blue to HTTP credentials (WebSocket enabled=%s)", async (websocket) => {
+  test.each([
+    [false, "gpt-5.6-sol"], [true, "gpt-5.6-sol"],
+    [false, "gpt-5.6-terra"], [true, "gpt-5.6-terra"],
+    [false, "gpt-5.6-luna"], [true, "gpt-5.6-luna"],
+  ] as const)("forwards Blue cyber selection (WebSocket enabled=%s, model=%s)", async (websocket, model) => {
     const identity = createHash("sha256").update("main@example.invalid").digest("hex")
     const auth = {
       type: "oauth" as const,
@@ -52,13 +56,13 @@ describe("plugin.codex", () => {
             "session-id": "cyber-session",
             ...(selection && { "x-opencode-cyber-access-program": selection }),
           },
-          body: JSON.stringify({ model: "gpt-5.6-sol", stream: true, input: [], reasoning: { effort: "max" } }),
+          body: JSON.stringify({ model, stream: true, input: [], reasoning: { effort: "max" } }),
         })
         await response.text()
         const viaWebSocket = websocket && !selection?.startsWith("daybreak_blue:")
         const sent = websocket ? ws.httpRequests().at(-1) : requests.at(-1)
         const body = viaWebSocket ? ws.messages().at(-1) : sent?.body
-        expect(body).toMatchObject({ model: "gpt-5.6-sol", reasoning: { effort: "max" } })
+        expect(body).toMatchObject({ model, reasoning: { effort: "max" } })
         expect((body as { access_programs?: unknown }).access_programs).toEqual(
           selection ? { cyber: selection.split(":")[0] } : undefined,
         )
@@ -92,6 +96,9 @@ describe("plugin.codex", () => {
     }
     for (const body of ["{", "null", "[]", '{"model":"gpt-6-astra"}', '{"model":"gpt-5.6-sol","access_programs":[]}']) {
       await expect(request(selection, body)).rejects.toThrow()
+    }
+    for (const model of ["gpt-5.6-cyber", "gpt-daybreak-blue-latest", "gpt-5.6-luna-other", "gpt-5.6-sol-fast"]) {
+      await expect(request(selection, JSON.stringify({ model }))).rejects.toThrow("Blue cyber mode requires")
     }
     await expect(request(selection, "{}", "https://example.invalid/not-responses")).rejects.toThrow("endpoint")
     auth = { ...auth, access: createTestJwt({ email: "work@example.invalid" }) }
