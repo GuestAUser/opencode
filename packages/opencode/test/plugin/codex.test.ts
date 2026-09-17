@@ -371,12 +371,13 @@ describe("plugin.codex", () => {
   test("filters unsupported modes and uses Codex context limits for OAuth GPT models", async () => {
     const hooks = await CodexAuthPlugin({} as never)
     const limit = { context: 1_050_000, input: 922_000, output: 128_000 }
+    const lunaLimit = { context: 1_050_000, input: 520_000, output: 128_000 }
     const provider = {
       models: {
         ...Object.fromEntries(
           ["gpt-5.4", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.7-pro"].map((id) => [
             id,
-            { id, api: { id }, limit, cost: {}, options: {} },
+            { id, api: { id }, limit: id === "gpt-5.6-luna" ? lunaLimit : limit, cost: {}, options: {} },
           ]),
         ),
         "gpt-5.4-pro": {
@@ -402,7 +403,7 @@ describe("plugin.codex", () => {
     expect(models["gpt-5.5"]?.limit).toEqual({ context: 400_000, input: 272_000, output: 128_000 })
     expect(models["gpt-5.6-sol"]?.limit).toEqual({ context: 400_000, input: 272_000, output: 128_000 })
     expect(models["gpt-5.6-terra"]?.limit).toEqual({ context: 400_000, input: 272_000, output: 128_000 })
-    expect(models["gpt-5.6-luna"]?.limit).toEqual({ context: 400_000, input: 272_000, output: 128_000 })
+    expect(models["gpt-5.6-luna"]?.limit).toEqual(lunaLimit)
     expect(models["gpt-5.4-pro"]).toBeUndefined()
     expect(models["gpt-5.7-pro"]).toBeDefined()
     expect(models["gpt-5.6-sol-high"]).toBeDefined()
