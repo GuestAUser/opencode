@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createServer, type IncomingMessage } from "node:http"
 import { type AddressInfo } from "node:net"
 import { WebSocketServer } from "ws"
+import { createHash } from "node:crypto"
 import {
   CodexAuthPlugin,
   parseJwtClaims,
@@ -19,6 +20,90 @@ function createTestJwt(payload: object): string {
 }
 
 describe("plugin.codex", () => {
+  test.each([false, true])("forwards cyber selection and binds Blue to HTTP credentials (WebSocket enabled=%s)", async (websocket) => {
+    const identity = createHash("sha256").update("main@example.invalid").digest("hex")
+    const auth = {
+      type: "oauth" as const,
+      access: createTestJwt({ "https://api.openai.com/profile": { email: "MAIN@example.invalid" } }),
+      refresh: "synthetic-refresh",
+      expires: Date.now() + 60_000,
+    }
+    const requests: { body: unknown; privateHeader: string | null }[] = []
+    using http = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        requests.push({ body: await request.json(), privateHeader: request.headers.get("x-opencode-cyber-access-program") })
+        return new Response("data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } })
+      },
+    })
+    await using ws = await createCodexWebSocketServer()
+    const hooks = await CodexAuthPlugin({} as never, {
+      experimentalWebSockets: websocket,
+      codexApiEndpoint: websocket ? ws.url : new URL("/responses", http.url).href,
+    })
+    try {
+      const loaded = await hooks.auth!.loader!(async () => auth, {} as never)
+      expect(loaded.opencodeCyberAccessPrograms).toBe(1)
+      for (const selection of [undefined, "standard", `daybreak_blue:${identity}`, "standard"]) {
+        const response = await loaded.fetch!("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            "session-id": "cyber-session",
+            ...(selection && { "x-opencode-cyber-access-program": selection }),
+          },
+          body: JSON.stringify({ model: "gpt-5.6-sol", stream: true, input: [], reasoning: { effort: "max" } }),
+        })
+        await response.text()
+        const viaWebSocket = websocket && !selection?.startsWith("daybreak_blue:")
+        const sent = websocket ? ws.httpRequests().at(-1) : requests.at(-1)
+        const body = viaWebSocket ? ws.messages().at(-1) : sent?.body
+        expect(body).toMatchObject({ model: "gpt-5.6-sol", reasoning: { effort: "max" } })
+        expect((body as { access_programs?: unknown }).access_programs).toEqual(
+          selection ? { cyber: selection.split(":")[0] } : undefined,
+        )
+        expect(viaWebSocket ? ws.headers()?.["x-opencode-cyber-access-program"] : sent?.privateHeader).toBeFalsy()
+        expect(JSON.stringify(body)).not.toContain(identity)
+      }
+      expect(ws.messages()).toHaveLength(websocket ? 3 : 0)
+      expect(ws.httpRequests()).toHaveLength(websocket ? 1 : 0)
+    } finally {
+      await hooks.dispose?.()
+    }
+    const apiHooks = await CodexAuthPlugin({} as never)
+    const api = await apiHooks.auth!.loader!(async () => ({ type: "api", key: "synthetic" }), {} as never)
+    expect(api.opencodeCyberAccessPrograms).toBeUndefined()
+  })
+
+  test("rejects invalid cyber selections and account changes before HTTP dispatch", async () => {
+    let requests = 0
+    using server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch() { requests++; return Response.json({}) } })
+    const main = createTestJwt({ email: "main@example.invalid" })
+    let auth = { type: "oauth", access: main, refresh: "synthetic", expires: Date.now() + 60_000 }
+    const hooks = await CodexAuthPlugin({} as never, { codexApiEndpoint: server.url.href })
+    const loaded = await hooks.auth!.loader!(async () => auth as never, {} as never)
+    const identity = createHash("sha256").update("main@example.invalid").digest("hex")
+    const selection = `daybreak_blue:${identity}`
+    const request = (control: string, body = JSON.stringify({ model: "gpt-5.6-sol" }), url = "https://api.openai.com/v1/responses") => loaded.fetch!(url, {
+      method: "POST", headers: { "x-opencode-cyber-access-program": control }, body,
+    })
+    for (const invalid of ["", "daybreak_red", "daybreak_blue", "daybreak_blue:bad", "standard:", "standard:extra", `${selection}:extra`]) {
+      await expect(request(invalid)).rejects.toThrow()
+    }
+    for (const body of ["{", "null", "[]", '{"model":"gpt-6-astra"}', '{"model":"gpt-5.6-sol","access_programs":[]}']) {
+      await expect(request(selection, body)).rejects.toThrow()
+    }
+    await expect(request(selection, "{}", "https://example.invalid/not-responses")).rejects.toThrow("endpoint")
+    auth = { ...auth, access: createTestJwt({ email: "work@example.invalid" }) }
+    await expect(request(selection)).rejects.toThrow("account changed")
+    auth = { ...auth, access: createTestJwt({ email: "main@example.invalid", "https://api.openai.com/profile": { email: "work@example.invalid" } }) }
+    await expect(request(selection)).rejects.toThrow("account changed")
+    auth = { ...auth, type: "api" }
+    await expect(request(selection)).rejects.toThrow("OAuth")
+    expect(requests).toBe(0)
+    await hooks.dispose?.()
+  })
+
   test("escapes provider errors in callback HTML", () => {
     const error = `</div><script>alert("xss" & 'more')</script>`
     const html = renderOAuthError(error)
@@ -473,11 +558,23 @@ async function waitFor(predicate: () => boolean) {
 
 async function createCodexWebSocketServer() {
   let headers: IncomingMessage["headers"] | undefined
-  const server = createServer()
+  const messages: unknown[] = []
+  const requests: { body: unknown; privateHeader: string | string[] | undefined }[] = []
+  const server = createServer(async (request, response) => {
+    const chunks = []
+    for await (const chunk of request) chunks.push(chunk)
+    requests.push({
+      body: JSON.parse(Buffer.concat(chunks).toString()),
+      privateHeader: request.headers["x-opencode-cyber-access-program"],
+    })
+    response.writeHead(200, { "content-type": "text/event-stream" })
+    response.end("data: [DONE]\n\n")
+  })
   const sockets = new WebSocketServer({ server })
   sockets.on("connection", (socket, request) => {
     headers = request.headers
-    socket.once("message", () => {
+    socket.on("message", (message) => {
+      messages.push(JSON.parse(message.toString()))
       socket.send(JSON.stringify({ type: "response.completed", response: { id: "resp_123" } }))
     })
   })
@@ -489,6 +586,8 @@ async function createCodexWebSocketServer() {
   return {
     url: `http://127.0.0.1:${address.port}/backend-api/codex/responses`,
     headers: () => headers,
+    messages: () => messages,
+    httpRequests: () => requests,
     async [Symbol.asyncDispose]() {
       for (const socket of sockets.clients) socket.terminate()
       sockets.close()

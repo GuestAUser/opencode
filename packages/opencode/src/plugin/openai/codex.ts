@@ -4,6 +4,7 @@ import { OAUTH_DUMMY_KEY } from "../../auth"
 import os from "os"
 import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
+import { createHash } from "node:crypto"
 import { OpenAIWebSocketPool } from "./ws-pool"
 import { OauthCallbackPage } from "@opencode-ai/core/oauth/page"
 
@@ -14,6 +15,8 @@ const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
 const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini"])
 const DISALLOWED_MODELS = new Set(["gpt-5.5-pro"])
+// Private plugin-to-transport control, always removed before network dispatch.
+const CYBER_HEADER = "x-opencode-cyber-access-program"
 
 interface PkceCodes {
   verifier: string
@@ -40,6 +43,7 @@ export interface IdTokenClaims {
   chatgpt_compute_residency?: string
   organizations?: Array<{ id: string }>
   email?: string
+  "https://api.openai.com/profile"?: { email?: string }
   "https://api.openai.com/auth"?: {
     chatgpt_account_id?: string
     chatgpt_compute_residency?: string
@@ -270,6 +274,38 @@ function waitForOAuthCallback(pkce: PkceCodes, state: string): Promise<TokenResp
   })
 }
 
+function cyberRequestBody(body: RequestInit["body"], selection: string, access: string) {
+  if (typeof body !== "string") throw new Error("Codex cyber selection requires a JSON request body")
+  let request: Record<string, unknown>
+  try {
+    request = JSON.parse(body)
+  } catch {
+    throw new Error("Codex cyber selection requires a JSON request body")
+  }
+  if (!request || typeof request !== "object" || Array.isArray(request))
+    throw new Error("Codex cyber selection requires a JSON object")
+  const [program, identity, ...extra] = selection.split(":")
+  if (extra.length || (program !== "standard" && program !== "daybreak_blue") || (program === "standard" && selection !== "standard"))
+    throw new Error("Unsupported Codex cyber selection")
+  if (program === "daybreak_blue") {
+    const claims = parseJwtClaims(access)
+    const top = claims?.email
+    const nested = claims?.["https://api.openai.com/profile"]?.email
+    const email = top ?? nested
+    if (
+      typeof email !== "string" || !email || !/^[a-f0-9]{64}$/.test(identity ?? "") ||
+      (top !== undefined && nested !== undefined && (typeof top !== "string" || typeof nested !== "string" || top.toLowerCase() !== nested.toLowerCase())) ||
+      createHash("sha256").update(email.toLowerCase()).digest("hex") !== identity
+    ) throw new Error("Codex cyber account changed or is unavailable; check /account and restart")
+    if (request.model !== "gpt-5.6-sol") throw new Error("Daybreak Blue mode currently requires GPT-5.6 Sol")
+  }
+  const programs = request.access_programs
+  if (programs !== undefined && (!programs || typeof programs !== "object" || Array.isArray(programs)))
+    throw new Error("Invalid Codex access programs")
+  request.access_programs = { ...programs, cyber: program }
+  return JSON.stringify(request)
+}
+
 export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPluginOptions = {}): Promise<Hooks> {
   const issuer = options.issuer ?? ISSUER
   const codexApiEndpoint = options.codexApiEndpoint ?? CODEX_API_ENDPOINT
@@ -347,7 +383,14 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
 
         return {
           apiKey: OAUTH_DUMMY_KEY,
+          opencodeCyberAccessPrograms: 1,
           async fetch(requestInput: RequestInfo | URL, init?: RequestInit) {
+            const control = new Headers(init?.headers)
+            const cyber = control.get(CYBER_HEADER)
+            if (cyber !== null) {
+              control.delete(CYBER_HEADER)
+              init = { ...init, headers: control }
+            }
             if (init?.headers) {
               if (init.headers instanceof Headers) {
                 init.headers.delete("authorization")
@@ -361,8 +404,10 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
             }
 
             const currentAuth = await getAuth()
-            if (currentAuth.type !== "oauth")
+            if (currentAuth.type !== "oauth") {
+              if (cyber !== null) throw new Error("Codex cyber selection requires current OAuth authentication")
               return websocketFetch ? websocketFetch(requestInput, init) : fetch(requestInput, init)
+            }
 
             const authWithAccount = currentAuth as typeof currentAuth & { accountId?: string }
 
@@ -421,6 +466,7 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
                 : new URL(typeof requestInput === "string" ? requestInput : requestInput.url)
             const rewrite = parsed.pathname.includes("/v1/responses") || parsed.pathname.includes("/chat/completions")
             const url = rewrite ? new URL(codexApiEndpoint) : parsed
+            if (cyber !== null && !rewrite) throw new Error("Codex cyber selection requires the Codex Responses endpoint")
             if (rewrite) {
               const residency = extractResidency(currentAuth.access)
               if (residency) headers.set("x-openai-internal-codex-residency", residency)
@@ -428,10 +474,11 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
 
             const requestInit = {
               ...init,
-              body: init?.body,
+              body: cyber === null ? init?.body : cyberRequestBody(init?.body, cyber, currentAuth.access),
               headers,
             }
-            if (websocketFetch && parsed.pathname.endsWith("/responses")) return websocketFetch(url, requestInit)
+            if (websocketFetch && parsed.pathname.endsWith("/responses") && !cyber?.startsWith("daybreak_blue:"))
+              return websocketFetch(url, requestInit)
             return fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit))
           },
         }
