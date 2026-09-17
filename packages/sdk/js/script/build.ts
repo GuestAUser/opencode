@@ -112,6 +112,14 @@ if (sseTypesPatched === sseTypesSource) {
 }
 await Bun.write(sseTypesPath, sseTypesPatched)
 
+const ssePath = "./src/v2/gen/core/serverSentEvents.gen.ts"
+const sseSource = await Bun.file(ssePath).text()
+const ssePatched = sseSource.replace("reader.cancel()", "void reader.cancel().catch(() => {})")
+if (ssePatched === sseSource) {
+  throw new Error(`SSE cancellation patch did not apply; @hey-api/openapi-ts output may have changed (${ssePath})`)
+}
+await Bun.write(ssePath, ssePatched)
+
 await $`bun prettier --write src/gen`
 await $`bun prettier --write src/v2`
 await $`rm -rf dist`
